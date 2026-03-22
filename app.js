@@ -12,7 +12,7 @@ const app = express();
 // --- KONFIGURACJA ---
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'TWOJ_TAJNY_KLUCZ'; // Używaj tego samego klucza wszędzie!
-const DB_URL = process.env.DB_URL || "mongodb+srv://szymow94_db_user:ueQ7SqlbmpThSJkU@cluster0.mofq7og.mongodb.net/?appName=Cluster0";
+const DB_URL = process.env.DB_URL || "mongodb+srv://szymow94_db_user:ueQ7SqlbmpThSJkU@cluster0.ruvggtd.mongodb.net/?appName=Cluster0";
 
 // --- MIDDLEWARE ---
 app.use(express.json());

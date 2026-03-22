@@ -10,6 +10,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/pl.global.min.js"></script>
+
     <style>
         :root {
             --bg-color: #f0f2f5;
@@ -110,6 +114,13 @@
                     </button>
                 </div>
             </div>
+
+            <div class="card shadow-sm mb-4 border bg-white rounded-3">
+    <div class="card-body p-3">
+        <h5 class="card-title fw-bold text-muted mb-3"><i class="fas fa-calendar-alt me-2"></i> Twój Harmonogram</h5>
+        <div id="calendar" style="min-height: 500px;"></div>
+    </div>
+</div>
 
             <div class="card shadow-sm mb-4 border bg-white rounded">
                 <div class="card-body p-3">
@@ -338,6 +349,9 @@
         } catch (err) {
             console.error("Błąd w fetchTasks:", err);
         }
+
+        loadCalendarEvents();
+
     }
 
     // 🎛️ Filtrowanie zadań
@@ -540,6 +554,77 @@
             }
         });
     }
+
+    
+let calendar; // Zmienna globalna
+
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+
+    if (calendarEl) {
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth', // Widok miesiąca
+            locale: 'pl',               // Język polski
+            firstDay: 1,                // Tydzień zaczyna się od poniedziałku
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            themeSystem: 'bootstrap5',
+            height: 'auto',
+            events: [] // Na start puste, załadujemy je z bazy
+        });
+
+        calendar.render();
+        loadCalendarEvents(); // Pobieramy zadania z bazy
+    }
+});
+
+// Funkcja pobierająca zadania i wrzucająca je do kalendarza
+async function loadCalendarEvents() {
+    const token = localStorage.getItem('token');
+    if (!token || !calendar) return;
+
+    try {
+        const res = await fetch('/tasks', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Błąd pobierania zadań do kalendarza");
+
+        const tasks = await res.json();
+
+        // Mapujemy zadania z bazy na format akceptowany przez FullCalendar
+        const events = tasks
+            .filter(task => task.dueDate) // Bierzemy tylko te z datą!
+            .map(task => {
+                // Kolor kropki w kalendarzu zależny od priorytetu
+                let color = '#0dcaf0'; // Info / Low
+                if (task.priority === 'high') color = '#dc3545'; // Danger
+                if (task.priority === 'medium') color = '#ffc107'; // Warning
+
+                return {
+                    id: task._id,
+                    title: task.title,
+                    start: task.dueDate,
+                    backgroundColor: task.completed ? '#6c757d' : color, // Szary jeśli zrobione
+                    borderColor: task.completed ? '#6c757d' : color,
+                    textColor: task.priority === 'medium' && !task.completed ? '#000' : '#fff', // Lepszy kontrast na żółtym
+                    extendedProps: { completed: task.completed }
+                };
+            });
+
+        // Czyszczenie starych i dodawanie nowych wydarzeń
+        calendar.removeAllEvents();
+        calendar.addEventSource(events);
+
+    } catch (err) {
+        console.error("Błąd ładowania kalendarza:", err);
+    }
+}
+
 </script>
 </body>
 </html>
