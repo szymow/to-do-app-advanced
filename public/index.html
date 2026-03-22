@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure ToDo | JWT Auth</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✅</text></svg>">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #121212 !important;
+            --card-bg: #1e1e1e !important;
+            --text-color: #ffffff !important;
+        }
+
+        [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, 
+        [data-theme="dark"] h5, [data-theme="dark"] span, [data-theme="dark"] p,
+        [data-theme="dark"] label {
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .card {
+            border: 1px solid #333 !important;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-color);
+            min-height: 100vh; 
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .hidden { display: none !important; }
+
+        .card { 
+            background-color: var(--card-bg) !important;
+            border-radius: 15px; 
+            border: none; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        }
+
+        .list-group-item {
+            background-color: var(--card-bg) !important;
+            color: var(--text-color) !important;
+            transition: transform 0.2s;
+        }
+
+        .list-group-item:hover {
+            transform: scale(1.01);
+        }
+
+        /* Animacja pulsowania przycisku */
+        @keyframes pulse-gray {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(108, 117, 125, 0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(108, 117, 125, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(108, 117, 125, 0); }
+        }
+
+        .btn-pulse {
+            animation: pulse-gray 2s infinite;
+        }
+
+        .task-title {
+            display: inline-block;
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    
+    <div id="authSection" class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card p-4">
+                <h3 class="text-center mb-4" id="authTitle">Zaloguj się</h3>
+                <input type="text" id="username" class="form-control mb-2" placeholder="Login">
+                <input type="password" id="password" class="form-control mb-3" placeholder="Hasło">
+                <button class="btn btn-primary w-100 mb-2" onclick="handleAuth('login')">Zaloguj</button>
+                <button class="btn btn-outline-secondary w-100 btn-sm" onclick="handleAuth('register')">Stwórz konto</button>
+                <div id="authError" class="text-danger mt-2 small text-center"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="todoSection" class="row justify-content-center hidden">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">Moje Zadania</h2>
+                <div class="d-flex gap-2">
+                    <button id="themeToggle" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-moon"></i> Tryb Ciemny
+                    </button>
+                    <button onclick="logout()" class="btn btn-sm btn-danger">
+                        <i class="fas fa-sign-out-alt"></i> Wyloguj
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border bg-white rounded">
+                <div class="card-body p-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-bold text-muted small mb-1">Co jest do zrobienia?</label>
+                            <input type="text" id="taskInput" class="form-control" placeholder="Wpisz treść zadania...">
+                        </div>
+
+                        <div class="col-6 col-md-2">
+                            <label class="form-label fw-bold text-muted small mb-1">Kategoria</label>
+                            <select id="taskCategory" class="form-select">
+                                <option value="ogólne">📁 ogólne</option>
+                                <option value="praca">💼 praca</option>
+                                <option value="dom">🏠 dom</option>
+                                <option value="hobby">🎨 hobby</option>
+                            </select>
+                        </div>
+
+                        <div class="col-6 col-md-2">
+                            <label class="form-label fw-bold text-muted small mb-1">Priorytet</label>
+                            <select id="taskPriority" class="form-select">
+                                <option value="low">Niski</option>
+                                <option value="medium">Średni</option>
+                                <option value="high">Wysoki</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-2">
+                            <label class="form-label fw-bold text-muted small mb-1">Termin</label>
+                            <input type="datetime-local" id="taskDeadline" class="form-control">
+                        </div>
+
+                        <div class="col-12 col-md-2">
+                            <button type="button" id="submitTaskBtn" onclick="handleTaskSubmit()" class="btn btn-primary w-100">
+                                <i class="fas fa-plus me-1"></i> Dodaj
+                            </button>
+                            <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="btn btn-secondary w-100 mt-1 d-none">
+                                Anuluj
+                            </button>
+                        </div>
+
+                        <input type="hidden" id="editTaskId">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+                        <div class="text-nowrap">
+                            <h5 class="mb-0">
+                                <span class="badge bg-primary rounded-pill">
+                                    Pozostało: <span id="activeCount">0</span> z <span id="totalCount">0</span>
+                                </span>
+                            </h5>
+                        </div>
+
+                        <div class="progress flex-grow-1 w-100" style="height: 25px;">
+                            <div id="taskProgressBar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                0%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 d-flex flex-wrap gap-2" id="filterContainer">
+                <button class="btn btn-sm btn-outline-secondary active" onclick="filterTasks('all', this)">Wszystkie</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="filterTasks('praca', this)">Praca</button>
+                <button class="btn btn-sm btn-outline-success" onclick="filterTasks('dom', this)">Dom</button>
+                <button class="btn btn-sm btn-outline-warning text-dark" onclick="filterTasks('hobby', this)">Hobby</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="filterTasks('ogólne', this)">Ogólne</button>
+            </div>
+
+            <ul id="taskList" class="list-group card overflow-hidden p-0"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    let notifiedTasks = new Set(); 
+
+    // 🔐 Autoryzacja
+    function checkLogin() {
+        const token = localStorage.getItem('token');
+        if (token) {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('todoSection').classList.remove('hidden');
+            fetchTasks();
+        } else {
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('todoSection').classList.add('hidden');
+        }
+    }
+
+    async function handleAuth(type) {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('authError');
+
+        try {
+            const res = await fetch(`/auth/${type}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || 'Błąd autoryzacji');
+
+            if (type === 'login') {
+                localStorage.setItem('token', data.token);
+                checkLogin();
+            } else {
+                alert('Konto stworzone! Możesz się zalogować.');
+            }
+        } catch (err) {
+            errorDiv.innerText = err.message;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        checkLogin();
+    }
+
+    // 📋 Renderowanie
+    function getCategoryBadge(category) {
+        const colors = {
+            'praca': 'bg-primary text-white',
+            'dom': 'bg-success text-white',
+            'hobby': 'bg-warning text-dark',
+            'ogólne': 'bg-secondary text-white'
+        };
+        const cat = category || 'ogólne'; 
+        const color = colors[cat] || 'bg-secondary text-white';
+        return `<span class="badge ${color}">${cat}</span>`;
+    }
+
+    async function fetchTasks() {
+        const token = localStorage.getItem('token');
+        const list = document.getElementById('taskList');
+        if (!token) return;
+
+        try {
+            const res = await fetch('/tasks', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) throw new Error("Błąd pobierania danych");
+            const tasks = await res.json();
+
+            // Powiadomienia powiązane z nadchodzącymi datami
+            if (typeof checkDeadlines === 'function') checkDeadlines(tasks);
+
+            list.innerHTML = ''; 
+
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.completed).length;
+            const active = total - completed;
+
+            document.getElementById('activeCount').innerText = active;
+            document.getElementById('totalCount').innerText = total;
+
+            const progressBar = document.getElementById('taskProgressBar');
+            const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+            progressBar.style.width = progressPercent + '%';
+            progressBar.innerText = progressPercent + '%';
+
+            if (total === 0) {
+                list.innerHTML = '<li class="list-group-item text-center text-muted p-4">Brak zadań na liście</li>';
+                return;
+            }
+
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+
+                let priorityClass = 'border-info';
+                if (task.priority === 'high') priorityClass = 'border-danger';
+                else if (task.priority === 'medium') priorityClass = 'border-warning';
+
+                let warningClass = '';
+                let deadlineHtml = '';
+
+                if (task.dueDate) {
+                    const deadline = new Date(task.dueDate);
+                    const now = new Date();
+                    const diffMs = deadline - now;
+                    const diffHours = diffMs / (1000 * 60 * 60);
+
+                    deadlineHtml = `<span class="text-muted ms-2" style="font-size: 0.85rem;"><i class="far fa-clock"></i> ${deadline.toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}</span>`;
+
+                    if (!task.completed) {
+                        if (diffMs < 0) {
+                            warningClass = 'bg-danger-subtle opacity-75';
+                        } else if (diffHours <= 2) {
+                            warningClass = 'animate__animated animate__pulse animate__infinite border-danger';
+                        }
+                    }
+                }
+
+                li.className = `list-group-item d-flex justify-content-between align-items-center mb-2 shadow-sm rounded-3 p-3 border-start border-5 ${priorityClass} ${warningClass}`;
+
+                li.innerHTML = `
+                    <div class="d-flex align-items-center" style="min-width: 0; flex: 1;">
+                        <span class="task-title ${task.completed ? 'text-decoration-line-through text-muted' : 'fw-bold'}" 
+                              onclick="toggleTask('${task._id}')" style="cursor:pointer; overflow: hidden; text-overflow: ellipsis; max-width: 80%; display: block;">
+                            ${task.title}
+                        </span>
+                        ${deadlineHtml}
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        ${getCategoryBadge(task.category)} 
+                        <span class="badge bg-light text-dark border text-uppercase" style="font-size: 0.75rem;">${task.priority}</span>
+                        <div class="vr mx-1"></div>
+                        <i class="fas fa-edit text-primary fs-5" onclick="editTask('${task._id}', '${task.title.replace(/'/g, "\\'")}', '${task.dueDate || ''}', '${task.priority}', '${task.category || 'ogólne'}')" style="cursor:pointer"></i>
+                        <i class="fas fa-trash text-danger fs-5" onclick="deleteTask('${task._id}')" style="cursor:pointer"></i>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+
+        } catch (err) {
+            console.error("Błąd w fetchTasks:", err);
+        }
+    }
+
+    // 🎛️ Filtrowanie zadań
+    function filterTasks(category, clickedButton) {
+        document.querySelectorAll('#filterContainer .btn').forEach(btn => btn.classList.remove('active'));
+        clickedButton.classList.add('active');
+
+        document.querySelectorAll('#taskList .list-group-item').forEach(taskEl => {
+            const badges = taskEl.querySelectorAll('.badge'); 
+            let taskCategory = 'ogólne';
+
+            badges.forEach(badge => {
+                const text = badge.innerText.trim().toLowerCase();
+                if (['praca', 'dom', 'hobby', 'ogólne'].includes(text)) {
+                    taskCategory = text;
+                }
+            });
+
+            if (category === 'all' || taskCategory === category.toLowerCase()) {
+                taskEl.style.setProperty('display', 'flex', 'important');
+            } else {
+                taskEl.style.setProperty('display', 'none', 'important');
+            }
+        });
+    }
+
+    // ➕ Tworzenie i zapisywanie
+    async function handleTaskSubmit() {
+        const editId = document.getElementById('editTaskId').value;
+        const title = document.getElementById('taskInput').value;
+        const priority = document.getElementById('taskPriority').value;
+        const category = document.getElementById('taskCategory').value;
+        const dueDateInput = document.getElementById('taskDeadline').value;
+
+        if (!title) return alert("Wpisz treść zadania!");
+
+        const taskData = { title, priority, category };
+        taskData.dueDate = dueDateInput === "" ? null : dueDateInput;
+
+        const url = editId ? `/tasks/${editId}` : '/tasks';
+        const method = editId ? 'PATCH' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(taskData)
+            });
+
+            if (res.ok) {
+                cancelEdit();
+                fetchTasks();
+            } else {
+                const errorData = await res.json();
+                alert("Błąd zapisu: " + (errorData.message || "Błędne dane."));
+            }
+        } catch (err) {
+            alert("Błąd połączenia z serwerem.");
+        }
+    }
+
+    // 🛠️ Edytor
+    function editTask(id, title, dueDate, priority, category) {
+        document.getElementById('editTaskId').value = id;
+        document.getElementById('taskInput').value = title;
+        document.getElementById('taskPriority').value = priority;
+        document.getElementById('taskCategory').value = category || "ogólne";
+
+        if (dueDate && dueDate !== 'null') {
+            document.getElementById('taskDeadline').value = new Date(dueDate).toISOString().slice(0, 16);
+        }
+
+        const btn = document.getElementById('submitTaskBtn');
+        btn.innerHTML = '<i class="fas fa-save me-1"></i> Zapisz';
+        btn.classList.replace('btn-primary', 'btn-warning');
+        document.getElementById('cancelEditBtn').classList.remove('d-none');
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        document.getElementById('editTaskId').value = '';
+        document.getElementById('taskInput').value = '';
+        document.getElementById('taskDeadline').value = '';
+        document.getElementById('taskPriority').value = 'low';
+        document.getElementById('taskCategory').value = 'ogólne';
+
+        const btn = document.getElementById('submitTaskBtn');
+        btn.innerHTML = '<i class="fas fa-plus me-1"></i> Dodaj';
+        btn.classList.replace('btn-warning', 'btn-primary');
+        document.getElementById('cancelEditBtn').classList.add('d-none');
+    }
+
+    // 🧹 Usuwanie i Przełączanie statusu
+    async function deleteTask(id) {
+        if (!confirm("Czy na pewno chcesz usunąć to zadanie?")) return;
+        
+        const token = localStorage.getItem('token');
+        await fetch(`/tasks/${id}`, { 
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        fetchTasks();
+    }
+
+    async function toggleTask(id) {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`/tasks/${id}/toggle`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) await fetchTasks(); 
+        } catch (err) {
+            console.error("Błąd toggle:", err);
+        }
+    }
+
+    // 🌙 Obsługa Trybu Ciemnego
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggle = document.getElementById('themeToggle');
+
+        const updateBtn = (isDark) => {
+            themeToggle.innerHTML = isDark 
+                ? '<i class="fas fa-sun"></i> Tryb Jasny' 
+                : '<i class="fas fa-moon"></i> Tryb Ciemny';
+        };
+
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            updateBtn(true);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                updateBtn(false);
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                updateBtn(true);
+            }
+        });
+
+        // 🟢 Nasłuchiwanie stanu pola tekstowego do animacji pulsowania przycisku „Dodaj”
+        const taskInput = document.getElementById('taskInput');
+        const submitBtn = document.getElementById('submitTaskBtn');
+
+        taskInput.addEventListener('input', () => {
+            if (taskInput.value.trim() === "") {
+                submitBtn.classList.add('btn-pulse', 'btn-secondary');
+                submitBtn.classList.remove('btn-primary');
+            } else {
+                submitBtn.classList.remove('btn-pulse', 'btn-secondary');
+                submitBtn.classList.add('btn-primary');
+            }
+        });
+        
+        // Polling (odświeżanie danych w tle)
+        setInterval(() => {
+            if (localStorage.getItem('token')) fetchTasks();
+        }, 60000);
+
+        checkLogin();
+    });
+
+    // 🔔 Powiadomienia w przeglądarce
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    function checkDeadlines(tasks) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+        const now = new Date();
+        const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
+
+        tasks.forEach(task => {
+            if (!task.dueDate || task.completed) return;
+
+            const deadline = new Date(task.dueDate);
+            if (isNaN(deadline.getTime())) return;
+
+            if (deadline > now && deadline <= thirtyMinutesFromNow) {
+                if (!notifiedTasks.has(task._id)) {
+                    new Notification("Zbliżający się termin!", {
+                        body: `Zadanie: "${task.title}" kończy się wkrótce!`
+                    }).onclick = () => window.focus();
+                    
+                    notifiedTasks.add(task._id);
+                }
+            } else {
+                notifiedTasks.delete(task._id);
+            }
+        });
+    }
+</script>
+</body>
+</html>
